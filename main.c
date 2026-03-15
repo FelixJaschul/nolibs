@@ -9,6 +9,10 @@ struct {
     Window window;
     XEvent event;
     unsigned int running;
+
+    /* buffer */
+    unsigned int* pixels;
+    XImage* ximage;
 } s = {0};
 
 #define A(x) do { if (!(x)) { printf("Assertion failed: %s\n", #x); exit(1); } } while(0)
@@ -24,8 +28,11 @@ int main(void)
 #define width 1270
 #define height 800
 
+    s.pixels = malloc(sizeof(unsigned int)*width*height);
+    A(s.pixels);
+
     s.window = XCreateSimpleWindow(
-        s.display, RootWindow(s.display, screen), None, None, width, height, None, None, WhitePixel(s.display, screen));
+        s.display, RootWindow(s.display, screen), None, None, width, height, None, None, BlackPixel(s.display, screen));
 
     XStoreName(s.display, s.window, "xeleven _f");
 
@@ -34,6 +41,9 @@ int main(void)
 
     XSelectInput(s.display, s.window, ExposureMask | KeyPressMask | StructureNotifyMask);
     XMapWindow(s.display, s.window);
+
+    s.ximage = XCreateImage(
+        s.display, DefaultVisual(s.display, screen), DefaultDepth(s.display, screen), ZPixmap, 0, (char*)s.pixels, width, height, 32, 0);
 
     s.running = 1;
     while (s.running)
@@ -44,11 +54,17 @@ int main(void)
         {
             case Expose:
                 /* No drawing yet. */
+                const int bs = 50;
+                for (int i = 0; i < width*height; i++) {
+                    if (((i % width)/bs + (i / width)/bs) % 2 == 0) s.pixels[i] = 0x670067;
+                    else s.pixels[i] = 0x67;
+                }
+                XPutImage(s.display, s.window, DefaultGC(s.display, screen), s.ximage, 0, 0, 0, 0, width, height);
                 break;
             case KeyPress:
-                const KeySym x= XLookupKeysym(&s.event.xkey, 0);
-                if (x == XK_Escape) s.running = 0;
-                if (x == XK_Return) L("hi");
+                const KeySym key = XLookupKeysym(&s.event.xkey, 0);
+                if (key == XK_Escape) s.running = 0;
+                if (key == XK_Return) L("hi");
                 break;
             case ClientMessage:
                 if ((Atom)s.event.xclient.data.l[0] == wm_delete) s.running = 0;
