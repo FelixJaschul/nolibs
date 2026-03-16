@@ -53,13 +53,13 @@ int main(void)
         switch (s.event.type)
         {
             case Expose:
-                /* No drawing yet. */
-                const int bs = 50;
-                for (int i = 0; i < width*height; i++) {
-                    if (((i % width)/bs + (i / width)/bs) % 2 == 0) s.pixels[i] = 0x670067;
-                    else s.pixels[i] = 0x67;
-                }
-                XPutImage(s.display, s.window, DefaultGC(s.display, screen), s.ximage, 0, 0, 0, 0, width, height);
+                /* drawing */ {
+                    const int bs = 50;
+                    for (int i = 0; i < width*height; i++) {
+                        if (((i % width)/bs + (i / width)/bs) % 2 == 0) s.pixels[i] = 0x670067;
+                        else s.pixels[i] = 0x67;
+                    }
+                } XPutImage(s.display, s.window, DefaultGC(s.display, screen), s.ximage, 0,0,0,0, width, height);
                 break;
             case KeyPress:
                 const KeySym key = XLookupKeysym(&s.event.xkey, 0);
