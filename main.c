@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <unistd.h>
 
 struct {
     Display* display;
@@ -25,9 +26,10 @@ struct {
     float x, y, z, yaw, pitch;
 } camera = {0, 0, -5, 0, 0};
 
-void draw(const int screen, const unsigned int bs)
+void draw(const int screen)
 {
     /* background */
+	const unsigned int bs = 50;
     for (int i = 0; i < WIDTH*HEIGHT; i++) {
         if (((i % WIDTH)/bs + (i / WIDTH)/bs) % 2 == 0) s.pixels[i] = 0x141414;
         else s.pixels[i] = 0x101010;
@@ -39,11 +41,22 @@ void draw(const int screen, const unsigned int bs)
     /* project */
     int px[3], py[3];
     for (int i = 0; i < 3; i++)
-	{
+    {
+        float dx = triangle[i][0] - camera.x;
+        float dy = triangle[i][1] - camera.y;
+        float dz = triangle[i][2] - camera.z;
+
         /* apply yaw rotation around Y */
-		const float dy = triangle[i][1] - camera.y;
-        float dx = triangle[i][0] - camera.x * cosf(camera.yaw) - (triangle[i][2] - camera.z) * sinf(camera.yaw);
-        float dz = dx * sinf(camera.yaw) + (triangle[i][2] - camera.z) * cosf(camera.yaw);
+        const float rx = dx * cosf(camera.yaw) - dz * sinf(camera.yaw);
+        const float rz = dx * sinf(camera.yaw) + dz * cosf(camera.yaw);
+        dx = rx;
+        dz = rz;
+
+        /* apply pitch rotation around X */
+        const float ry = dy * cosf(camera.pitch) - dz * sinf(camera.pitch);
+        const float rz2 = dy * sinf(camera.pitch) + dz * cosf(camera.pitch);
+        dy = ry;
+        dz = rz2;
 
         if (dz < 0.1f) dz = 0.1f;
 
@@ -113,40 +126,80 @@ int main()
     auto wm_delete = XInternAtom(s.display, "WM_DELETE_WINDOW", False);
     XSetWMProtocols(s.display, s.window, &wm_delete, 1);
 
-    XSelectInput(s.display, s.window, ExposureMask | KeyPressMask | StructureNotifyMask);
+    XSelectInput(s.display, s.window, ExposureMask | KeyPressMask | KeyReleaseMask | PointerMotionMask | StructureNotifyMask);
     XMapWindow(s.display, s.window);
 
     s.ximage = XCreateImage(
         s.display, DefaultVisual(s.display, screen), DefaultDepth(s.display, screen), ZPixmap, 0, (char*)s.pixels, WIDTH, HEIGHT, 32, 0);
 
-    s.running = 1;
-    unsigned int bs = 50;
-    while (s.running)
-    {
-        XNextEvent(s.display, &s.event);
+    int shift_down = 0, grab_active = 0;
+    const float mouse_sens = 0.005f;
 
+    Pixmap blank = XCreatePixmap(s.display, s.window, 1, 1, 1);
+    XColor dummy;
+    Cursor invisible = XCreatePixmapCursor(s.display, blank, blank, &dummy, &dummy, 0, 0);
+    XFreePixmap(s.display, blank);
+
+    s.running = 1;
+    while (s.running) {
+		while (XPending(s.display)) {
+        XNextEvent(s.display, &s.event);
         switch (s.event.type)
         {
-            case Expose:
-                draw(screen, bs);
+            case Expose: draw(screen);
             case KeyPress:
                 const KeySym key = XLookupKeysym(&s.event.xkey, 0);
                 if (key == XK_Escape) s.running = 0;
+                if (key == XK_Shift_L || key == XK_Shift_R) {
+                    shift_down = 1;
+                    if (!grab_active) {
+                        XGrabPointer(s.display, s.window, True, PointerMotionMask, GrabModeAsync, GrabModeAsync, s.window, invisible, CurrentTime);
+                        XWarpPointer(s.display, None, s.window, 0, 0, 0, 0, WIDTH / 2, HEIGHT / 2);
+                        grab_active = 1;
+                    }
+                }
                 /* move camera */ float speed = 0.1f;
                 if (key == XK_w) { camera.x += sinf(camera.yaw)*speed; camera.z += cosf(camera.yaw)*speed; }
                 if (key == XK_s) { camera.x -= sinf(camera.yaw)*speed; camera.z -= cosf(camera.yaw)*speed; }
                 if (key == XK_a) { camera.x -= cosf(camera.yaw)*speed; camera.z += sinf(camera.yaw)*speed; }
                 if (key == XK_d) { camera.x += cosf(camera.yaw)*speed; camera.z -= sinf(camera.yaw)*speed; }
-                /* rotate camera */
-                if (key == XK_Left) camera.yaw -= 0.04f;
-                if (key == XK_Right) camera.yaw += 0.04f;
-                draw(screen, bs);
+				break;
+            case KeyRelease:
+                const KeySym key_release = XLookupKeysym(&s.event.xkey, 0);
+                if (key_release == XK_Shift_L || key_release == XK_Shift_R) {
+                    shift_down = 0;
+                    if (grab_active) {
+                        XUngrabPointer(s.display, CurrentTime);
+                        grab_active = 0;
+                    }
+                } break;
             case ClientMessage:
                 if ((Atom)s.event.xclient.data.l[0] == wm_delete) s.running = 0;
                 break;
             default: break;
         }
-    }
+    	}
+
+    	if (shift_down && grab_active)
+		{
+        	Window root, child;
+        	int root_x, root_y, win_x, win_y;
+        	unsigned int mask;
+        	if (XQueryPointer(s.display, s.window, &root, &child, &root_x, &root_y, &win_x, &win_y, &mask))
+			{
+            	const int dx = win_x - WIDTH / 2;
+            	const int dy = win_y - HEIGHT / 2;
+            	if (dx != 0 || dy != 0) {
+                	camera.yaw += dx * mouse_sens;
+                	camera.pitch -= dy * mouse_sens;
+                	if (camera.pitch > 1.5f) camera.pitch = 1.5f;
+                	if (camera.pitch < -1.5f) camera.pitch = -1.5f;
+                	XWarpPointer(s.display, None, s.window, 0, 0, 0, 0, WIDTH / 2, HEIGHT / 2);
+            	}
+        	}
+		}
+		draw(screen);
+	}
 
 #undef WIDTH
 #undef HEIGHT
