@@ -36,6 +36,9 @@ void draw(const int screen)
     }
 
     /* triangle vertices in world space */
+	//    a							a, b, c  = {x, y, z};
+	//	/   \						triangle = {a, b, c};
+	// b ___ c							a			 b			 c
     const float triangle[3][3] = { {0, 1.5, 0}, {-2, -1, 0}, {2, -1, 0} };
 
     /* project */
@@ -47,16 +50,12 @@ void draw(const int screen)
         float dz = triangle[i][2] - camera.z;
 
         /* apply yaw rotation around Y */
-        const float rx = dx * cosf(camera.yaw) - dz * sinf(camera.yaw);
-        const float rz = dx * sinf(camera.yaw) + dz * cosf(camera.yaw);
-        dx = rx;
-        dz = rz;
+        dx = dx * cosf(camera.yaw) - dz * sinf(camera.yaw);
+        dz = dx * sinf(camera.yaw) + dz * cosf(camera.yaw);
 
         /* apply pitch rotation around X */
-        const float ry = dy * cosf(camera.pitch) - dz * sinf(camera.pitch);
-        const float rz2 = dy * sinf(camera.pitch) + dz * cosf(camera.pitch);
-        dy = ry;
-        dz = rz2;
+        dy = dy * cosf(camera.pitch) - dz * sinf(camera.pitch);
+        dz = dy * sinf(camera.pitch) + dz * cosf(camera.pitch);
 
         if (dz < 0.1f) dz = 0.1f;
 
