@@ -75,15 +75,10 @@ void draw(const int screen)
         const int min_y = (ay < by ? (ay < cy ? ay : cy) : (by < cy ? by : cy));
         const int max_y = (ay > by ? (ay > cy ? ay : cy) : (by > cy ? by : cy));
 
-        const int x0 = min_x < 0 ? 0 : min_x;
-        const int x1 = max_x >= WIDTH ? WIDTH - 1 : max_x;
-        const int y0 = min_y < 0 ? 0 : min_y;
-        const int y1 = max_y >= HEIGHT ? HEIGHT - 1 : max_y;
-
         const float inv_area = 1.0f / area;
-        for (int y = y0; y <= y1; y++)
+        for (int y = (min_y < 0 ? 0 : min_y); y <= (max_y >= HEIGHT ? HEIGHT - 1) : max_y; y++)
 		{
-            for (int x = x0; x <= x1; x++)
+            for (int x = (min_x < 0 ? 0 : min_x); x <= (max_x >= WIDTH ? WIDTH - 1 : max_x); x++)
 			{
                 float w0 = (float)((bx - cx) * (y - cy) + (cy - by) * (x - cx)) * inv_area;
                 float w1 = (float)((cx - ax) * (y - ay) + (ay - cy) * (x - ax)) * inv_area;
