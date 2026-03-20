@@ -76,7 +76,7 @@ void draw(const int screen)
         const int max_y = (ay > by ? (ay > cy ? ay : cy) : (by > cy ? by : cy));
 
         const float inv_area = 1.0f / area;
-        for (int y = (min_y < 0 ? 0 : min_y); y <= (max_y >= HEIGHT ? HEIGHT - 1) : max_y; y++)
+        for (int y = (min_y < 0 ? 0 : min_y); y <= (max_y >= HEIGHT ? HEIGHT - 1 : max_y); y++)
 		{
             for (int x = (min_x < 0 ? 0 : min_x); x <= (max_x >= WIDTH ? WIDTH - 1 : max_x); x++)
 			{
@@ -134,45 +134,58 @@ int main()
     Cursor invisible = XCreatePixmapCursor(s.display, blank, blank, &dummy, &dummy, 0, 0);
     XFreePixmap(s.display, blank);
 
+    int key[4] = {0, 0, 0, 0};
     s.running = 1;
     while (s.running) {
 		while (XPending(s.display)) {
-        XNextEvent(s.display, &s.event);
-        switch (s.event.type)
-        {
-            case Expose: draw(screen);
-            case KeyPress:
-                const KeySym key = XLookupKeysym(&s.event.xkey, 0);
-                if (key == XK_Escape) s.running = 0;
-                if (key == XK_Shift_L || key == XK_Shift_R) {
-                    shift_down = 1;
-                    if (!grab_active) {
-                        XGrabPointer(s.display, s.window, True, PointerMotionMask, GrabModeAsync, GrabModeAsync, s.window, invisible, CurrentTime);
-                        XWarpPointer(s.display, None, s.window, 0, 0, 0, 0, WIDTH / 2, HEIGHT / 2);
-                        grab_active = 1;
+            XNextEvent(s.display, &s.event);
+            switch (s.event.type)
+            {
+                case Expose:
+                    draw(screen);
+                    break;
+                case KeyPress: {
+                    KeySym keys = XLookupKeysym(&s.event.xkey, 0);
+                    if (keys == XK_Escape) s.running = 0;
+                    if (keys == XK_Shift_L || keys == XK_Shift_R) {
+                        shift_down = 1;
+                        if (!grab_active) {
+                            XGrabPointer(s.display, s.window, True, PointerMotionMask, GrabModeAsync, GrabModeAsync, s.window, invisible, CurrentTime);
+                            XWarpPointer(s.display, None, s.window, 0, 0, 0, 0, WIDTH / 2, HEIGHT / 2);
+                            grab_active = 1;
+                        }
                     }
-                }
-                /* move camera */ float speed = 0.1f;
-                if (key == XK_w) { camera.x += sinf(camera.yaw)*speed; camera.z += cosf(camera.yaw)*speed; }
-                if (key == XK_s) { camera.x -= sinf(camera.yaw)*speed; camera.z -= cosf(camera.yaw)*speed; }
-                if (key == XK_a) { camera.x -= cosf(camera.yaw)*speed; camera.z += sinf(camera.yaw)*speed; }
-                if (key == XK_d) { camera.x += cosf(camera.yaw)*speed; camera.z -= sinf(camera.yaw)*speed; }
-				break;
-            case KeyRelease:
-                const KeySym key_release = XLookupKeysym(&s.event.xkey, 0);
-                if (key_release == XK_Shift_L || key_release == XK_Shift_R) {
-                    shift_down = 0;
-                    if (grab_active) {
-                        XUngrabPointer(s.display, CurrentTime);
-                        grab_active = 0;
+                    if (keys == XK_w) key[0] = 1;
+                    if (keys == XK_a) key[1] = 1;
+                    if (keys == XK_s) key[2] = 1;
+                    if (keys == XK_d) key[3] = 1;
+				    break; }
+                case KeyRelease: {
+                    KeySym keys = XLookupKeysym(&s.event.xkey, 0);
+                    if (keys == XK_Shift_L || keys == XK_Shift_R) {
+                        shift_down = 0;
+                        if (grab_active) {
+                            XUngrabPointer(s.display, CurrentTime);
+                            grab_active = 0;
+                        }
                     }
-                } break;
-            case ClientMessage:
-                if ((Atom)s.event.xclient.data.l[0] == wm_delete) s.running = 0;
-                break;
-            default: break;
-        }
+                    if (keys == XK_w) key[0] = 0;
+                    if (keys == XK_a) key[1] = 0;
+                    if (keys == XK_s) key[2] = 0;
+                    if (keys == XK_d) key[3] = 0;
+                    break; }
+                case ClientMessage:
+                    if ((Atom)s.event.xclient.data.l[0] == wm_delete) s.running = 0;
+                    break;
+                default: break;
+            }
     	}
+
+        float speed = 0.1f;
+        if (key[0]) { camera.x += sinf(camera.yaw)*speed; camera.z += cosf(camera.yaw)*speed; }
+        if (key[2]) { camera.x -= sinf(camera.yaw)*speed; camera.z -= cosf(camera.yaw)*speed; }
+        if (key[1]) { camera.x -= cosf(camera.yaw)*speed; camera.z += sinf(camera.yaw)*speed; }
+        if (key[3]) { camera.x += cosf(camera.yaw)*speed; camera.z -= sinf(camera.yaw)*speed; }
 
     	if (shift_down && grab_active)
 		{
