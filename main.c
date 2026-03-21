@@ -50,12 +50,16 @@ void draw(const int screen)
         float dz = triangle[i][2] - camera.z;
 
         /* apply yaw rotation around Y */
-        dx = dx * cosf(camera.yaw) - dz * sinf(camera.yaw);
-        dz = dx * sinf(camera.yaw) + dz * cosf(camera.yaw);
+        float x1 = dx * cosf(camera.yaw) - dz * sinf(camera.yaw);
+        float z1 = dx * sinf(camera.yaw) + dz * cosf(camera.yaw);
 
         /* apply pitch rotation around X */
-        dy = dy * cosf(camera.pitch) - dz * sinf(camera.pitch);
-        dz = dy * sinf(camera.pitch) + dz * cosf(camera.pitch);
+        float y2 = dy * cosf(camera.pitch) - z1 * sinf(camera.pitch);
+        float z2 = dy * sinf(camera.pitch) + z1 * cosf(camera.pitch);
+
+        dx = x1;
+        dy = y2;
+        dz = z2;
 
         if (dz < 0.1f) dz = 0.1f;
 
